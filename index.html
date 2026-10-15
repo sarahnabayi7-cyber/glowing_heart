@@ -1,0 +1,215 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Red</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="heart"></canvas>
+
+<script>
+const canvas = document.getElementById("heart");
+const ctx = canvas.getContext("2d");
+
+let width, height;
+let particles = [];
+let heartPoints = [];
+
+const PARTICLE_COUNT = 4500;
+
+function resizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    width = window.innerWidth;
+    height = window.innerHeight;
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    createHeart();
+}
+
+function heartShape(t) {
+    return {
+        x: 16 * Math.pow(Math.sin(t), 3),
+        y: -(
+            13 * Math.cos(t)
+            - 5 * Math.cos(2 * t)
+            - 2 * Math.cos(3 * t)
+            - Math.cos(4 * t)
+        )
+    };
+}
+
+function createHeart() {
+    particles = [];
+    heartPoints = [];
+
+    const scale = Math.min(width / 38, height / 38, 13);
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const t = Math.random() * Math.PI * 2;
+        const edge = heartShape(t);
+
+        // Fill the inside of the heart as well as its outline.
+        const fill = Math.sqrt(Math.random());
+
+        const x = centerX + edge.x * scale * fill;
+        const y = centerY + edge.y * scale * fill;
+
+        particles.push({
+            x,
+            y,
+            originX: x,
+            originY: y,
+            size: Math.random() * 1.7 + 0.35,
+            alpha: Math.random() * 0.65 + 0.25,
+            phase: Math.random() * Math.PI * 2,
+            speed: Math.random() * 2 + 0.5,
+            drift: Math.random() * 2 + 0.5
+        });
+    }
+
+    // Add a cloud of particles around the heart.
+    for (let i = 0; i < 1300; i++) {
+        const t = Math.random() * Math.PI * 2;
+        const edge = heartShape(t);
+        const spread = 1 + Math.random() * 0.4;
+
+        heartPoints.push({
+            x: centerX + edge.x * scale * spread
+                + (Math.random() - 0.5) * 24,
+            y: centerY + edge.y * scale * spread
+                + (Math.random() - 0.5) * 24,
+            size: Math.random() * 1.5 + 0.3,
+            alpha: Math.random() * 0.5 + 0.08,
+            phase: Math.random() * Math.PI * 2,
+            speed: Math.random() * 2 + 0.5
+        });
+    }
+}
+
+function draw(time) {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+    ctx.fillRect(0, 0, width, height);
+
+    const pulse = 1 + Math.sin(time * 0.0018) * 0.018;
+    const centerX = width / 2;
+    const centerY = height / 2;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.scale(pulse, pulse);
+    ctx.translate(-centerX, -centerY);
+
+    // Soft red aura.
+    const aura = ctx.createRadialGradient(
+        centerX, centerY, 5,
+        centerX, centerY, Math.min(width, height) * 0.43
+    );
+
+    aura.addColorStop(0, "rgba(255, 0, 15, 0.12)");
+    aura.addColorStop(0.45, "rgba(130, 0, 0, 0.06)");
+    aura.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+    ctx.fillStyle = aura;
+    ctx.fillRect(0, 0, width, height);
+
+    // Floating particles surrounding the heart.
+    heartPoints.forEach(p => {
+        const flicker = 0.3 + 0.7 *
+            Math.abs(Math.sin(time * 0.001 * p.speed + p.phase));
+
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255, 20, 35, ${p.alpha * flicker})`;
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Bright heart particles.
+    particles.forEach(p => {
+        const flicker = 0.45 + 0.55 *
+            Math.abs(Math.sin(time * 0.0015 * p.speed + p.phase));
+
+        const wobbleX = Math.sin(time * 0.0008 + p.phase)
+            * p.drift;
+        const wobbleY = Math.cos(time * 0.001 + p.phase)
+            * p.drift;
+
+        const x = p.originX + wobbleX;
+        const y = p.originY + wobbleY;
+
+        // A soft halo around each particle.
+        ctx.shadowBlur = 7;
+        ctx.shadowColor = "#ff0018";
+
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(255, 15, 30, ${p.alpha * flicker})`;
+        ctx.arc(x, y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+    });
+
+    // Bright central line down the heart.
+    const lineGlow = ctx.createLinearGradient(
+        centerX, centerY - 150,
+        centerX, centerY + 170
+    );
+
+    lineGlow.addColorStop(0, "rgba(255, 0, 0, 0)");
+    lineGlow.addColorStop(0.45, "rgba(255, 0, 0, 0.8)");
+    lineGlow.addColorStop(1, "rgba(255, 0, 0, 0)");
+
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "red";
+    ctx.strokeStyle = lineGlow;
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - 120);
+    ctx.lineTo(centerX, centerY + 170);
+    ctx.stroke();
+
+    ctx.restore();
+    ctx.shadowBlur = 0;
+
+    requestAnimationFrame(draw);
+}
+
+window.addEventListener("resize", resizeCanvas);
+
+resizeCanvas();
+requestAnimationFrame(draw);
+</script>
+
+</body>
+</html>
